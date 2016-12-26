@@ -1,0 +1,137 @@
+#+TITLE: Loading Baseball Statistics Using Clojure
+#+AUTHOR: Robert Erb
+#+EMAIL: bob.erb@gmail.com
+#+LANGUAGE: en
+#+STARTUP: align indent fold nodlcheck hidestars oddeven lognotestate
+#+PROPERTY: tangle baseball.clj
+
+* Beginning Baseball Stats Analysis with Clojure
+** Who pitched for the Pirates last year?
+**** That's my use case.
+** Free stats online!
+**** text in standard, documented formats!
+* Download the data.
+** http://www.retrosheet.org/events/2013eve.zip
+* Load players.
+** We need a data structure to hold players.  Use a map that maps directly to the data format.  Write a function that, given a line of data, returns a player.
+#+name: player
+#+BEGIN_SRC clojure :exports code :results silent :session s1
+  (defn player [data]
+    "Returns a player bursted out of `data`."
+    (let [[id lname fname bats throws team-id position]
+          (clojure.string/split data #",")]
+      {:id id :lname lname :fname fname :bats bats :throws throws
+       :team-id team-id :position position}))
+#+END_SRC
+** Now write a function that, given a list of lines, returns a list of players:
+#+name: roster-from-lines
+#+BEGIN_SRC clojure :exports code :results silent :session s1
+  (defn players-for-lines [lines]
+    "Returns a list of players created from `lines`."
+    (if (empty? lines)
+      []
+      (conj (players-for-lines (rest lines))
+            (player (clojure.string/trim (first lines))))))
+#+END_SRC
+** Now a function to read a file and return a list of players:
+#+name: load-roster
+#+BEGIN_SRC clojure :exports code :results silent :session s1
+  (defn load-players [file]
+    "Returns a roster of players loaded from file `file`."
+          (players-from-lines (clojure.string/split (slurp file)
+                                                    #"\n")))
+#+END_SRC(defn load-roster [file]
+** Test.
+#+name: test-loading-players
+#+BEGIN_SRC clojure :exports code :results silent :session s1
+  (def pirates (load-players (str data-directory "PIT2013.ROS")))
+  (count pirates)
+#+END_SRC(defn load-roster [file]
+49
+#+name: test-loading-players-continued
+#+BEGIN_SRC clojure :exports code :results silent :session s1
+(first pirates)
+#+END_SRC(defn load-roster [file]
+{:id "zagum001", :lname "Zagurski", :fname "Mike", :bats "L", :throws "L", :team-id "PIT", :position "P"}
+* Answer the question.
+#+name: test-loading-players-continued
+#+BEGIN_SRC clojure :exports code :results silent :session s1
+(def pirates-pitchers (filter #(= (:position %1) "P") pirates))
+(pprint (last pirates-pitchers))
+#+END_SRC(defn load-roster [file]
+{:id "blacv001",
+ :lname "Black",
+ :fname "Vic",
+ :bats "R",
+ :throws "R",
+ :team-id "PIT",
+ :position "P"}
+nil
+* Answer some other questions.
+** What's the ratio of left to right handed pirate pitchers?
+#+name: ratio-of-left-to-right-handed-pirate-pitchers
+#+BEGIN_SRC clojure :exports code :results silent :session s1
+  (def southpaws (filter #(= (:throws %1) "L") pirates-pitchers))
+  (def righties  (filter #(= (:throws %1) "R") pirates-pitchers))
+  (/ (count southpaws) (count righties))
+#+END_SRC(defn load-roster [file]
+8/19
+** Does Francisco Liriano bat right or left?
+#+name: does-liriano-bat-left-or-right
+#+BEGIN_SRC clojure :exports code :results silent :session s1
+  (:bats (first (filter #(and (= (:fname %1) "Francisco")
+                              (= (:lname %1) "Liriano")) pirates-pitchers)))
+#+END_SRC(defn load-roster [file]
+"L"
+* Load the teams.
+** We need a data structure to hold the team data.
+***** Team data is provided as CSV with the following format:
+****** id,league,city,nickname
+****** Here's a sample:
+******* ANA,A,Anaheim,Angels
+***** How about a map with keys
+****** :id
+****** :league
+****** :city
+****** :nickname
+** Each line in the file represents one team, so write a function that takes a line as input and returns a team.
+#+name: team
+#+BEGIN_SRC clojure :exports code :results silent :session s1
+  (defn team [data]
+    "Returns a team map bursted out of `data`."
+    (let [[id league city name] (clojure.string/split data #",")]
+      {:id id :league league :city city :name name}))
+#+END_SRC
+** There's a number of teams in one file, so write a function that takes a list of lines and returns a list of teams.
+#+name: teams-for-lines
+#+BEGIN_SRC clojure :exports code :results silent :session s1
+(defn teams-for-lines [lines]
+  "Returns a map of teams created from `lines`, indexed by id."
+  (if (empty? lines)
+    {}
+    (let [this-team (team (clojure.string/trim (first lines)))
+          this-team-id (:id this-team)]
+      (conj (teams-for-lines (rest lines))
+            (hash-map this-team-id this-team)))))
+#+END_SRC
+** Now a function to read a file, break it into lines, and pass it to teams-for-lines:
+#+name: load-teams
+#+BEGIN_SRC clojure :exports code :results silent :session s1
+  (defn load-teams [file]
+    "Returns teams loaded from file `file`".
+    (teams-for-lines (clojure.string/split (slurp file)
+                                           #"\n")))
+#+END_SRC
+** Test.
+#+name: testing-load-teams
+#+BEGIN_SRC clojure :exports code :results silent :session s1
+  (def teams (load-teams "TEAMS2013"))
+  (keys teams)
+#+END_SRC
+("COL" "NYN" "MIA" "BOS" "TEX" "CIN" "CHN" "KCA" "WAS" "BAL" "HOU" "SEA" "MIL" "PHI" "MIN" "TBA" "DET" "ANA" "SLN" "NYA" "TOR" "ARI" "OAK" "LAN" "ATL" "SFN" "PIT" "CHA" "CLE" "SDN")
+#+BEGIN_SRC clojure :exports code :results silent :session s1
+#+name: testing-load-teams
+#+BEGIN_SRC clojure :exports code :results silent :session s1
+  (get teams "PIT")
+#+END_SRC
+{:id "PIT", :league "N", :city "Pittsburgh", :name "Pirates"}

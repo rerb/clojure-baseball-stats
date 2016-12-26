@@ -1,0 +1,51 @@
+(use '[datomic.api :only [q db] :as d])
+(def uri "datomic:mem://baseball")
+(d/create-database uri)
+(def cnx (d/connect uri))
+
+(def schema-tx [{:db/id #db/id[:db.part/db]
+                 :db/ident :league/name
+                 :db/valueType :db.type/string
+                 :db/cardinality :db.cardinality/one
+                 :db/doc "A league's name"
+                 :db.install/_attribute :db.part/db}
+                {:db/id #db/id[:db.part/db]
+                 :db/ident :team/name
+                 :db/valueType :db.type/string
+                 :db/cardinality :db.cardinality/one
+                 :db/doc "A team's name"
+                 :db.install/_attribute :db.part/db}
+                {:db/id #db/id[:db.part/db]
+                 :db/ident :team/city
+                 :db/valueType :db.type/string
+                 :db/cardinality :db.cardinality/one
+                 :db/doc "A team's city"
+                 :db.install/_attribute :db.part/db}
+                {:db/id #db/id [:db.part/db]
+                 :db/ident :team/league
+                 :db/valueType :db.type/ref
+                 :db/cardinality :db.cardinality/one
+                 :db/doc "League a team is in"
+                 :db.install/_attribute :db.part/db}
+                ])
+
+@(d/transact cnx schema-tx)
+
+(def data-tx [{:league/name "American" :db/id #db/id[:db.part/user -1000001]}
+              {:league/name "National" :db/id #db/id[:db.part/user -1000002]}
+              {:team/name "Pirates"
+               :db/id #db/id[:db.part/user -1000003]
+               :team/city "Pittsburgh"
+               :team/league #db/id[:db.part/user -1000002]}
+              ])
+
+@(d/transact cnx data-tx)
+
+(def q-result (q '[:find ?t
+                   :where [?t :team/name]]
+                 (db cnx)))
+
+(def id (ffirst q-result))
+(def entity (-> cnx db (d/entity id)))
+(keys entity)
+(:team/name entity)
